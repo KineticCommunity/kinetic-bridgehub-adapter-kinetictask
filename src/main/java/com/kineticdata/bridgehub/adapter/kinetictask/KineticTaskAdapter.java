@@ -22,7 +22,7 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -36,10 +36,10 @@ public class KineticTaskAdapter implements BridgeAdapter {
     /*----------------------------------------------------------------------------------------------
      * PROPERTIES
      *--------------------------------------------------------------------------------------------*/
-    
+
     /** Defines the adapter display name. */
     public static final String NAME = "Kinetic Task Bridge";
-    
+
     /** Defines the logger */
     protected static final org.slf4j.Logger logger = LoggerFactory.getLogger(KineticTaskAdapter.class);
 
@@ -56,13 +56,13 @@ public class KineticTaskAdapter implements BridgeAdapter {
             VERSION = "Unknown";
         }
     }
-    
+
     /** Defines the collection of property names for the adapter. */
     public static class Properties {
         public static final String TASK_URL = "Kinetic Task Url";
     }
     private String taskUrl;
-    
+
     private final ConfigurablePropertyMap properties = new ConfigurablePropertyMap(
             new ConfigurableProperty(Properties.TASK_URL).setIsRequired(true)
     );
@@ -73,22 +73,22 @@ public class KineticTaskAdapter implements BridgeAdapter {
     public static final List<String> VALID_STRUCTURES = Arrays.asList(new String[] {
         "Trees","Runs","Tasks","Task Messages"
     });
-    
+
     /**
-     *  The keys for values that will be pulled out of the query of the Runs structures 
+     *  The keys for values that will be pulled out of the query of the Runs structures
      *  (Runs/Tasks/Task Messages) before passing along to the Task Server.
      */
     public static final List<String> RUNS_PATH_COMPONENTS = Arrays.asList(new String[] {
         "source","runId","taskId","messageId"
     });
-    
+
     /**
      *  The keys for values that will be pulled out of the query of the Trees structure
      *  before passing along to the Task Server (currently nothing should be pulled out so
      *  we have an empty array list).
      */
     public static final List<String> TREES_PATH_COMPONENTS = new ArrayList();
-    
+
     /*---------------------------------------------------------------------------------------------
      * SETUP METHODS
      *-------------------------------------------------------------------------------------------*/
@@ -96,31 +96,31 @@ public class KineticTaskAdapter implements BridgeAdapter {
     public String getName() {
         return NAME;
     }
-    
+
     @Override
     public String getVersion() {
        return VERSION;
     }
-    
+
     @Override
     public ConfigurablePropertyMap getProperties() {
         return properties;
     }
-    
+
     @Override
     public void setProperties(Map<String,String> parameters) {
         properties.setValues(parameters);
     }
-     
+
     @Override
     public void initialize() throws BridgeError {
         this.taskUrl = properties.getValue(Properties.TASK_URL);
     }
-    
+
     /*---------------------------------------------------------------------------------------------
      * IMPLEMENTATION METHODS
      *-------------------------------------------------------------------------------------------*/
-    
+
     @Override
     public Count count(BridgeRequest request) throws BridgeError {
         if (!VALID_STRUCTURES.contains(request.getStructure()))   throw new BridgeError("Invalid Structure: '" + request.getStructure() + "' is not a valid structure");
@@ -132,7 +132,7 @@ public class KineticTaskAdapter implements BridgeAdapter {
         } else if (request.getStructure().equals("Task Messages")) {
             request.setQuery(request.getQuery()+"&include=tasks.messages");
         }
-        
+
         Map<String,String> query;
         if (request.getStructure().equals("Trees")) {
             query = separatePathComponentsAndEncodeQuery(request.getQuery(),TREES_PATH_COMPONENTS);
@@ -150,11 +150,11 @@ public class KineticTaskAdapter implements BridgeAdapter {
                 throw new BridgeError("A Task Id needs to be provided in the query in the form of 'taskId=TASK_ID'");
             }
         }
-        
-        HttpClient client = new DefaultHttpClient();
+
+        HttpClient client = HttpClients.createDefault();
         String url = request.getStructure().equals("Trees") ? buildTreesUrl(this.taskUrl,query.get("query"),1,0) : buildRunsUrl(this.taskUrl,query.get("source"),query.get("runId"),query.get("query"),1,0);
         HttpGet get = new HttpGet(url);
-        
+
         String output;
         int statusCode;
         try {
@@ -165,7 +165,7 @@ public class KineticTaskAdapter implements BridgeAdapter {
         } catch (IOException e) {
             throw new BridgeError("Unable to make a connection to the Kinetic Task instance",e);
         }
-        
+
         Integer count = 0;
         if (statusCode == 200) {
             JSONObject json = (JSONObject)JSONValue.parse(output);
@@ -207,14 +207,14 @@ public class KineticTaskAdapter implements BridgeAdapter {
             logger.error(output);
             throw new BridgeError(String.format("%s: There was an error encountered when attempting to retrieve data. See the full response from Kinetic Task in the Bridgehub logs.Original Error: %s",statusCode,output));
         }
-        
+
         return new Count(count);
     }
-    
+
     @Override
     public Record retrieve(BridgeRequest request) throws BridgeError {
         if (!VALID_STRUCTURES.contains(request.getStructure()))   throw new BridgeError("Invalid Structure: '" + request.getStructure() + "' is not a valid structure");
-        
+
         request.setQuery(substituteQueryParameters(request));
         // Add the include statement to the query if the structure is Tasks or Task Messages
         if (request.getStructure().equals("Tasks")) {
@@ -222,7 +222,7 @@ public class KineticTaskAdapter implements BridgeAdapter {
         } else if (request.getStructure().equals("Task Messages")) {
             request.setQuery(request.getQuery()+"&include=tasks.messages");
         }
-        
+
         Map<String,String> query;
         if (request.getStructure().equals("Trees")) {
             query = separatePathComponentsAndEncodeQuery(request.getQuery(),TREES_PATH_COMPONENTS);
@@ -242,11 +242,11 @@ public class KineticTaskAdapter implements BridgeAdapter {
                 throw new BridgeError("A Message Id needsto be provided in the query in the form of 'messageId=MESSAGE_ID'");
             }
         }
-        
-        HttpClient client = new DefaultHttpClient();
+
+        HttpClient client = HttpClients.createDefault();
         String url = request.getStructure().equals("Trees") ? buildTreesUrl(this.taskUrl,query.get("query"),2,0) : buildRunsUrl(this.taskUrl,query.get("source"),query.get("runId"),query.get("query"),null,null);
         HttpGet get = new HttpGet(url);
-        
+
         String output;
         int statusCode;
         try {
@@ -257,7 +257,7 @@ public class KineticTaskAdapter implements BridgeAdapter {
         } catch (IOException e) {
             throw new BridgeError("Unable to make a connection to the Kinetic Task instance",e);
         }
-        
+
         Map<String,Object> result = new LinkedHashMap<String,Object>();
         if (statusCode == 200) {
             JSONObject json = (JSONObject)JSONValue.parse(output);
@@ -346,7 +346,7 @@ public class KineticTaskAdapter implements BridgeAdapter {
             logger.error(output);
             throw new BridgeError(String.format("%s: There was an error encountered when attempting to retrieve data. See the full response from Kinetic Task in the Bridgehub logs. Original Error: %s",statusCode,output));
         }
-        
+
         if (result.isEmpty()) {
             result = null;
         } else {
@@ -354,14 +354,14 @@ public class KineticTaskAdapter implements BridgeAdapter {
                 result.put(key, toString(result.get(key)));
             }
         }
-        
+
         return new Record(result);
     }
 
     @Override
     public RecordList search(BridgeRequest request) throws BridgeError {
         if (!VALID_STRUCTURES.contains(request.getStructure()))   throw new BridgeError("Invalid Structure: '" + request.getStructure() + "' is not a valid structure");
-         
+
         request.setQuery(substituteQueryParameters(request));
         // Add the include statement to the query if the structure is Tasks or Task Messages
         if (request.getStructure().equals("Tasks")) {
@@ -369,13 +369,13 @@ public class KineticTaskAdapter implements BridgeAdapter {
         } else if (request.getStructure().equals("Task Messages")) {
             request.setQuery(request.getQuery()+"&include=tasks.messages");
         }
-        
+
         Map<String,String> query;
         if (request.getStructure().equals("Trees")) {
             query = separatePathComponentsAndEncodeQuery(request.getQuery(),TREES_PATH_COMPONENTS);
         } else {
             // Throw an error if any validation issues are found
-            query = separatePathComponentsAndEncodeQuery(request.getQuery(),RUNS_PATH_COMPONENTS);        
+            query = separatePathComponentsAndEncodeQuery(request.getQuery(),RUNS_PATH_COMPONENTS);
             if (query.get("source") == null)  {
                 throw new BridgeError("A Task Source needs to be provided in the query in the form of 'source=YOUR_SOURCE'");
             }
@@ -387,10 +387,10 @@ public class KineticTaskAdapter implements BridgeAdapter {
             }
         }
 
-        HttpClient client = new DefaultHttpClient();
+        HttpClient client = HttpClients.createDefault();
         String url = request.getStructure().equals("Trees") ? buildTreesUrl(this.taskUrl,query.get("query"),null,null) : buildRunsUrl(this.taskUrl,query.get("source"),query.get("runId"),query.get("query"),null,null);
         HttpGet get = new HttpGet(url);
-        
+
         String output;
         int statusCode;
         try {
@@ -401,7 +401,7 @@ public class KineticTaskAdapter implements BridgeAdapter {
         } catch (IOException e) {
             throw new BridgeError("Unable to make a connection to the Kinetic Task instance",e);
         }
-        
+
         List<Record> records = new ArrayList<Record>();
         if (statusCode == 200) {
             JSONObject json = (JSONObject)JSONValue.parse(output);
@@ -469,7 +469,7 @@ public class KineticTaskAdapter implements BridgeAdapter {
             logger.error(output);
             throw new BridgeError(String.format("%s: There was an error encountered when attempting to retrieve data. See the full response from Kinetic Task in the Bridgehub logs. Original Error: %s",statusCode,output));
         }
-        
+
         // Convert records to <String,String> for the bridge
         for (Record record : records) {
             Map<String,Object> map = record.getRecord();
@@ -478,19 +478,19 @@ public class KineticTaskAdapter implements BridgeAdapter {
             }
             record.setRecord(map);
         }
-        
+
         return new RecordList(request.getFields(),records);
     }
-    
+
     /*---------------------------------------------------------------------------------------------
      * HELPER METHODS
      *-------------------------------------------------------------------------------------------*/
-    
+
     private String substituteQueryParameters(BridgeRequest request) throws BridgeError {
         KineticTaskQualificationParser parser = new KineticTaskQualificationParser();
         return parser.parse(request.getQuery(),request.getParameters());
     }
-    
+
     /* Removes any path components from the url and adds them to the map
        separately from the URL Encoded query. Any string passed in the path
        components list will be removed from the encoded query returned from
@@ -498,7 +498,7 @@ public class KineticTaskAdapter implements BridgeAdapter {
     */
     private Map<String,String> separatePathComponentsAndEncodeQuery(String query,List<String> pathComponents) {
         Map<String,String> separatedQuery = new HashMap<String,String>();
-        
+
         String[] indvQueryParts = query.split("&(?=[^&]*?=)");
         List<String> queryPartsList = new ArrayList<String>();
         for (String indvQueryPart : indvQueryParts) {
@@ -512,14 +512,14 @@ public class KineticTaskAdapter implements BridgeAdapter {
                 // Don't add limit and offset to the query because they will be handled
                 // using pagination metadata and we don't want one to overwrite the other
                 continue;
-            } else if (StringUtils.isNotBlank(field)) { 
-                queryPartsList.add(URLEncoder.encode(field)+"=" +URLEncoder.encode(value)); 
+            } else if (StringUtils.isNotBlank(field)) {
+                queryPartsList.add(URLEncoder.encode(field)+"=" +URLEncoder.encode(value));
             }
         }
         separatedQuery.put("query",StringUtils.join(queryPartsList,"&"));
         return separatedQuery;
     }
-    
+
     /*
     Takes a base Kinetic Task url (localhost:8080/kinetic-task), a source, run id, and a previously
     escaped query string and builds a url from it based on the inputted information
@@ -529,7 +529,7 @@ public class KineticTaskAdapter implements BridgeAdapter {
         try {
             escapedSource = new URI(null,null,source,null).toString();
         } catch (Exception e) { throw new BridgeError("There was a problem escaping the source '"+source+"'",e); }
-        
+
         StringBuilder url = new StringBuilder();
         // Create the url path
         url.append(taskUrl);
@@ -542,15 +542,15 @@ public class KineticTaskAdapter implements BridgeAdapter {
         if (StringUtils.isNotBlank(escapedQuery)) url.append(escapedQuery);
         if (limit != null && limit != 0) url.append("&limit=").append(String.valueOf(limit));
         if (offset != null && offset != 0) url.append("&offset=").append(String.valueOf(offset));
-        
+
         return url.toString();
     }
-    
+
     /*
     Takes a base Kinetic Task url (localhost:8080/kinetic-task) a previously
     escaped query string and builds a url from it based on the inputted information
     */
-    private String buildTreesUrl(String taskUrl,String escapedQuery,Integer limit,Integer offset) throws BridgeError {       
+    private String buildTreesUrl(String taskUrl,String escapedQuery,Integer limit,Integer offset) throws BridgeError {
         StringBuilder url = new StringBuilder();
         // Create the url path
         url.append(taskUrl);
@@ -560,17 +560,17 @@ public class KineticTaskAdapter implements BridgeAdapter {
         if (StringUtils.isNotBlank(escapedQuery)) url.append(escapedQuery);
         if (limit != null && limit != 0) url.append("&limit=").append(String.valueOf(limit));
         if (offset != null && offset != 0) url.append("&offset=").append(String.valueOf(offset));
-        
+
         return url.toString();
     }
-    
+
      /**
        * Returns the string value of the object.
        * <p>
        * If the value is not a String, a JSON representation of the object will be returned.
-       * 
+       *
        * @param value
-       * @return 
+       * @return
        */
     private String toString(Object value) {
         String result = null;
