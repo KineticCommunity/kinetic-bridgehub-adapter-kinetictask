@@ -14,6 +14,17 @@
   </scm>
   <url>http://maven.apache.org</url>
 
+  <distributionManagement>
+      <repository>
+          <id>com.kineticdata</id>
+          <url>http://utilities.kineticdata.com/nexus/content/repositories/releases/</url>
+      </repository>
+      <snapshotRepository>
+          <id>com.kineticdata.snapshots</id>
+          <url>http://utilities.kineticdata.com/nexus/content/repositories/snapshots</url>
+      </snapshotRepository>
+  </distributionManagement>
+
   <repositories>
         <repository>
           <id>com.kineticdata</id>
@@ -69,7 +80,7 @@
         <version>2.6</version>
     </dependency>
   </dependencies>
-  
+
   <build>
       <resources>
             <resource>
